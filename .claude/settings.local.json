@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php artisan:*)",
+      "Bash(curl -s -I http://127.0.0.1:8000/)",
+      "WebFetch(domain:developer.payway.com.kh)",
+      "WebSearch"
+    ]
+  }
+}
