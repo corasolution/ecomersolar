@@ -56,15 +56,27 @@ ABA_PAYWAY_URL=https://payway.ababank.com/api/
 ```
 
 ### Service: `app/Services/AbaPayService.php`
-- `generateQR(Order $order)` — builds EMVCo KHQR string with CRC16
-- `verifyWebhookSignature(Request $request)` — validates X-ABA-Signature header (HMAC-SHA256)
+- `getPaymentFormData(Order $order)` — builds signed form fields for ABA PayWay JS popup checkout
+- `checkPaymentStatus(string $tranId)` — calls check-transaction-2 API to poll payment status
+- `verifyWebhookSignature(Request $request)` — validates X_PAYWAY_HMAC_SHA512 header (HMAC-SHA512)
 - Webhook CSRF exempt via `bootstrap/app.php` → `except: ['webhooks/*']`
+- **Empty params filtered**: return array uses `array_filter` to strip `''`/`null` fields — ABA rejects null params (Error: "Please remove null params from your request")
+- **No `payout` field**: removed entirely from both hash and request — ABA returns "payout service is not available on your profile" if sent (Error Code: payout not enabled)
 
 ### Payment Flow
-1. Order created → QR generated → shown on confirmation page
-2. Customer scans with ABA app or taps deep link `aba://pay?qr={base64QR}`
-3. ABA sends webhook → `POST /webhooks/aba-pay`
-4. `OrderPaid` event fired → `OrderPaidMail` queued → order status updated
+1. Order created → `getPaymentFormData()` builds signed fields → passed to frontend as Inertia props
+2. Frontend renders hidden form fields and triggers ABA PayWay JS popup
+3. Customer completes payment in popup
+4. ABA redirects to `return_url` / `cancel_url`
+5. ABA sends webhook → `POST /webhooks/aba-pay`
+6. `OrderPaidMail` queued → order status updated
+
+### ABA PayWay Domain Whitelist (Error Code 6)
+If you see **"Unable to process — Requested Domain is not in whitelist"**:
+1. Log in to ABA PayWay merchant portal (sandbox: https://merchant-sandbox.payway.com.kh)
+2. Go to **Settings → Integration**
+3. Add your domain to the whitelist (e.g. `localhost`, `localhost:8000`, or your production domain)
+4. For production, whitelist your actual server domain before going live
 
 ## Laravel 13 Patterns
 - **No Kernel.php** — all middleware in `bootstrap/app.php`
